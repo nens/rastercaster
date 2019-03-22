@@ -63,6 +63,6 @@ Deze definition type is te gebruiken om ingewikkelde profielen te definiëren, z
 - pixel: de puntrepresentatie van de betreffende pixel
 - geom: de geometrie van de surface polygoon
 - aux_1 t/m aux_6: de bij de surface polygoon horende hulpgeometrie uit de tabel rc.auxiliary_line
-Voorbeelden van dergelijke formules zijn te vinden in de [RasterCaster Mold Library] (https://docs.google.com/spreadsheets/d/1nrRuSO89Rfs1AuXtvw6QpmeLq1P5CMJCD1IZiEAK1dg/edit?usp=sharing).
+Voorbeelden van dergelijke formules zijn te vinden in de [RasterCaster Mold Library](https://docs.google.com/spreadsheets/d/1nrRuSO89Rfs1AuXtvw6QpmeLq1P5CMJCD1IZiEAK1dg/edit?usp=sharing).
 
 ## Errors / known issues
