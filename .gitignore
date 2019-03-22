@@ -1,0 +1,6 @@
+log/
+debug/
+dev/
+Scripts/
+.dbeaver-data-sources.xml
+.project
