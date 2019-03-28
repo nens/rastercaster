@@ -1,68 +1,91 @@
 # RasterCaster
-**DEMs en andere rasters maken aan de hand van polygonen met voor elke polygoon een specifieke definitie van het hoogteverloop.**
+** Make DEMs and other rasters from polygons with a specific gradient definition for each polygon. **
 
-_Gemaakt door Leendert van Wolfswinkel (2018-2019)_
+_Made by Leendert van Wolfswinkel, Nelen & Schuurmans in partnership with Deltares (2018-2019)_
 
-## Python user interface
-### Installatie
-- Zorg dat je de GitHub repository nens\rastercaster hebt gekloond en gesynchroniseerd
-- Kopieer het bestandje {pad_naar_jouw_GitHub_map}\GitHub\rastercaster\settings.ini naar een projectmapje
-- Open settings.ini en vul in.
-- In OSGeo4W:
+## Introduction
+The RasterCaster allows the user to create digital elevation models geotiffs from vector data (points, lines and polygons). Elevation is a continous variable and therefore better represented by a raster than polygons or other vector formats. However, raster data is much harder to edit than vector data. RasterCaster bridges this gap. The user makes a set of polygons that cover the area of interest and do not overlap. The polygons may be hand-drawn directly into GIS, but can also be derived from landscape desings (usually CAD drawings). 
 
-`cd {pad_naar_jouw_GitHub_map}\GitHub\rastercaster`
+The polygons can be seen as ‘molds’, that are used to ‘cast’ the elevation map into. Each polygon contains a definition of the altitude variations within it. Simple elevation profiles (e.g. the flat floor level within a building) can be cast using a simple definition, while at the same time the RasterCaster offers the user all flexibility to add more complex profiles (e.g. a sloping road with a convex cross section). Currently, molds can be defined in four different way - see under Definition Types.
 
-`python rastercaster.py -install {pad_naar_jouw_projectmap}\settings.ini`
+The RasterCaster lives in a PostGIS database, so you need to install PostGIS or have access to an existing PostGIS database. All vector data are stored there. The first time you _cast_, for each polygon a raster is created and stored in the database. The next time you cast, rasters are only generated for polygons that have been edited (geometry and/or attributes). All data edits are done directly in the PostGIS tables (using QGIS for example). Installing the RasterCaster into your database, casting your raster and a few other things are done via a Python script that takes command line arguments. Depending on available funding, a QGIS plugin may be developed in the future. 
 
-### Casten (exporteren naar .tif)
+## Requirements
+Postgres >= 10.0
+PostGIS >= 2.2
+Python 2 or 3
+QGIS 3.x
 
-- In OSGeo4W:
+Currently only the Dutch projection RD New (EPSG:28992) is supported.
 
-`cd {pad_naar_jouw_GitHub_map}\GitHub\rastercaster`
+## Command line user interface
 
-`python rastercaster.py -cast {pad_naar_jouw_projectmap}\settings.ini`
+### Installation
+1. Clone or download the GitHub repo
+2. Copy settings.ini and fill with the values specific to your project
+3. In Command Prompt (or OSGeo4W):
 
-### Hulplijnen genereren
-## Tabellen
-Na installatie bevat de database een schema 'rc'.  De tabellen in dit schema vormen de inputdata voor de RasterCaster. 
+`cd {path_to_your_GitHub_map} \ GitHub \ rastercaster
+
+python rastercaster.py -install {path_to_your_projectmap} \ settings.ini`
+
+### Casting (export to .tif)
+
+- In Command Prompt (or OSGeo4W):
+
+`cd {path_to_your_GitHub_map} \ GitHub \ rastercaster`
+
+`python rastercaster.py -cast {path_to_your_projectmap} \ settings.ini`
+
+### Generate guides
+## Tables
+After installation, the database contains an 'rc' schema. The tables in this schema represent the input data for the RasterCaster.
 
 ### Surface
-De tabel rc.surface bevat de polygonen die door de RasterCaster in rasters worden omgezet. Het hoogteverloop binnen een surface wordt gedefiniëerd door de attributen van de polygoon, op een manier die afhangt van de  definition_type (zie hieronder).
+The rc.surface table contains the polygons that are converted to rasters by the RasterCaster. The elevation gradient within a surface is defined by the attributes of the polygon, in a way that depends on the definition_type (see below). This table has the following fields:
 
+    id | integer 
+    definition | text | DEFAULT 'NULL'
+    definition_type | text NOT NULL DEFAULT 'custom',
+    comment | text
+    geom | geometry(Polygon, 28992) NOT NULL,
+    aux_1 .. aux_6 | integer
+    param_1 .. param_6 | double precision
+   
 ### Elevation Point
-Deze moet je binnen de elevation_point_search_radius (in de .ini) van een lijn leggen. Als je zeker wilt weten dat het punt wordt meegenomen, zorg dat je snapping aan hebt.
+You must place this within the elevation_point_search_radius (in the .ini) of a line. If you want to make sure that the point is included, make sure you have snapping on.
 
-De tabel rc.elevation_point heeft de volgende kolommen:
+The rc.elevation_point table has the following columns:
 
-- id: integer, unieke identifier. Wordt automatisch ingevuld als je deze leeg laat.
-- elevation: hoogte (mNAP)
-- geom: puntgeometrie zonder z-coördinaat
-- geom_3d: puntgeometrie met als z-coördinaat de waarde die in het veld 'elevation' is ingevuld. Niet vullen, gaat automatisch.
-- in_polygon_only: vul hier 'true' in om de elevation alleen mee te laten tellen voor de surface waar het punt in ligt. Default is false. Zie hieronder bij definition type 'tin'.
+- id: integer, unique identifier. Will be filled in automatically if you leave this blank.
+- elevation: height (mNAP)
+- geom: point geometry without z-coordinate
+- geom_3d: point geometry with the value entered in the 'elevation' field as z-coordinate. No filling is automatic.
+- in_polygon_only: enter 'true' here to have the elevation count only for the surface where the point is located. Default is false. See below under definition type 'tin'.
 
 ### Auxiliary Line
-De tabel rc.auxiliary_line kan je inzetten om ingewikkelde hoogteprofielen te definieren. 
+You can use the rc.auxiliary_line table to define complex height profiles.
 
-Als je een ingewikkeld hoogteprofiel wil maken of de brondata die je gebruikt (bijv. vanuit een CAD-tekening) bevat te weinig detail (in rc.surface) dan kan je er voor kiezen om hulplijnen te trekken. Een hulplijn kan bijvoorbeeld zijn: een lijn die de as van een weg aan geeft. Als je bijvoorbeeld een bolle weg wil creëren dan geef je, in de rc.surface tabel, definition_type: 'custom' op. Aan de hand van een functie kan het hoogteverloop tussen de as en kant van de weg geïnterpoleerd worden.  Voor meer informatie zie: definition_type.
+If you want to create a complicated height profile or the source data that you use (eg from a CAD drawing) contains too little detail (in rc.surface) then you can choose to draw guides. For example, a helpline can be: a line that indicates the axis of a road. For example, if you want to create a convex path, enter definition_type: 'custom' in the rc.surface table. Based on a function, the gradient of height between the axis and roadside can be interpolated. For more information see: definition_type.
 
 ## Definition Types
-Het veld definition_type in de tabel rc.surface bepaalt hoe het hoogteverloop van de betreffende polygoon wordt gedefinieerd. In dat veld kunnen momenteel de volgende types worden ingevuld:
+The definition_type field in the rc.surface table determines how the height gradient of the relevant polygon is defined. The following types can currently be entered in that field:
 
-### 'constant'
-Dezelfde hoogte in de gehele polygoon. De gewenste hoogte geef je op in het veld 'param_1'. Dit is bijvoorbeeld bruikbaar voor het aanbrengen van vloerpeilen van woningen in de DEM. 
+### "constant"
+The same height in the entire polygon. Enter the desired height in the 'param_1' field. This is useful, for example, for installing floor levels of homes in the DEM.
 
 ### 'tin'
-Hoogtegegevens worden uit elevation_points gehaald die op of nabij de rand van de polygoon liggen. Dit kan zowel een binnenrand als de buitenrand zijn. De hoogte wordt opgegeven in het veld elevation van de elevation_point. Een elevation_point wordt meegenomen in de bepaling van het hoogteverloop als hij dichter bij de rand ligt dan de elevation_point_search_radius in de instellingen. Als je wilt dat twee aangrenzende polygonen op hun gedeelde grens een verschillende hoogte krijgen (bijvoorbeeld bij een stoeprand), kan je de elevation point in de polygoon leggen (wel dicht genoeg bij de rand) en 'true' invullen in het veld in_polygon_only.
+Elevation data is retrieved from elevation_points that lie on or near the edge of the polygon. This can be either an inner edge or the outer edge. The height is specified in the elevation field of the elevation_point. An elevation_point is included in the determination of the height gradient if it is closer to the edge than the elevation_point_search_radius in the settings. If you want two adjacent polygons to have a different height at their shared boundary (for example at a curb), you can place the elevation point in the polygon (close enough to the edge) and enter 'true' in the in_polygon_only field.
 
 ### 'filler'
-Het hoogteverloop wordt geinterpoleerd op basis van de omliggende rasterwaarden. 
+The height gradient is interpolated based on the surrounding grid values.
 
 ### 'custom'
-Deze definition type is te gebruiken om ingewikkelde profielen te definiëren, zoals een bolle of holle weg met tevens een verloop in de lengterichting. Het hoogteverloop wordt bepaald door een formule die opgegeven wordt in het veld definition. De taal van de formule is postgresql.  De volgende termen worden op een speciale manier behandeld:
+This definition type can be used to define complex profiles, such as a convex or concave path with a longitudinal gradient. The height gradient is determined by a formula that is specified in the definition field. The language of the formula is postgresql. The following terms are treated in a special way:
 
-- pixel: de puntrepresentatie van de betreffende pixel
-- geom: de geometrie van de surface polygoon
-- aux_1 t/m aux_6: de bij de surface polygoon horende hulpgeometrie uit de tabel rc.auxiliary_line
-Voorbeelden van dergelijke formules zijn te vinden in de [RasterCaster Mold Library](https://docs.google.com/spreadsheets/d/1nrRuSO89Rfs1AuXtvw6QpmeLq1P5CMJCD1IZiEAK1dg/edit?usp=sharing).
+- pixel: the dot representation of the pixel in question
+- geom: the geometry of the surface polygon
+- aux_1 to aux_6: the auxiliary geometry from the rc.auxiliary_line table associated with the surface polygon
+Examples of such formulas can be found in the [RasterCaster Mold Library] (https://docs.google.com/spreadsheets/d/1nrRuSO89Rfs1AuXtvw6QpmeLq1P5CMJCD1IZiEAK1dg/edit?usp=sharing).
 
 ## Errors / known issues
