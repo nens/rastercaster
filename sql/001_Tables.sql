@@ -154,6 +154,7 @@
 	DROP TABLE IF EXISTS rc.elevation_point CASCADE;
 	CREATE TABLE rc.elevation_point (
 		id serial,
+		comment text,
 		elevation double precision,
 		geom geometry(Point, 28992) NOT NULL,
 		geom_3d geometry(PointZ, 28992),
