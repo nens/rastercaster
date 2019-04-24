@@ -15,10 +15,11 @@
 		    custom_definition text;
 		    empty_raster raster;
 		BEGIN
-			SELECT 	definition, definition_type, geom, aux_1, aux_2, aux_3, aux_4, aux_5, aux_6, param_1, param_2, param_3, param_4, param_5, param_6
+			--RAISE NOTICE '-----------------------------------------';
+			SELECT 	definition, 	definition_type, 	geom, 	aux_1, 	aux_2, 	aux_3, 	aux_4, 	aux_5, 	aux_6, 	param_1, 	param_2, 	param_3, 	param_4, 	param_5, 	param_6
 			FROM 	rc.surface 
 			WHERE 	id = id_to_update 
-			INTO 	_definition, _definition_type, _geom, _aux_1, _aux_2, _aux_3, _aux_4, _aux_5, _aux_6, _param_1, _param_2, _param_3, _param_4, _param_5, _param_6
+			INTO 	_definition, 	_definition_type, 	_geom, 	_aux_1, _aux_2,	_aux_3,	_aux_4,	_aux_5,	_aux_6,	_param_1, 	_param_2, 	_param_3, 	_param_4, 	_param_5, 	_param_6
 			;
 			
 
@@ -58,9 +59,9 @@
 			SELECT geom FROM rc.auxiliary_line WHERE id = _aux_1 INTO aux_1_geom;
 			SELECT geom FROM rc.auxiliary_line WHERE id = _aux_2 INTO aux_2_geom;
 			SELECT geom FROM rc.auxiliary_line WHERE id = _aux_3 INTO aux_3_geom;
-			SELECT geom FROM rc.auxiliary_line WHERE id = _aux_4 INTO aux_1_geom;
-			SELECT geom FROM rc.auxiliary_line WHERE id = _aux_5 INTO aux_2_geom;
-			SELECT geom FROM rc.auxiliary_line WHERE id = _aux_6 INTO aux_3_geom;
+			SELECT geom FROM rc.auxiliary_line WHERE id = _aux_4 INTO aux_4_geom;
+			SELECT geom FROM rc.auxiliary_line WHERE id = _aux_5 INTO aux_5_geom;
+			SELECT geom FROM rc.auxiliary_line WHERE id = _aux_6 INTO aux_6_geom;
 			
 			SELECT cbf.cbf_name FROM rc.callbackfunctions AS cbf WHERE _definition_type = cbf.definition_type INTO cbf_name;
 			cbf_fullname := 'cbf_' || cbf_name || ' (double precision [][], int[][], text[])';
@@ -71,7 +72,9 @@
 			IF _definition_type = 'custom' THEN
 				-- geom
 				custom_definition := replace(_definition, 'geom', 'ST_GeomFromEWKT(''' ||ST_AsEWKT(_geom)||''')');
-
+				--RAISE NOTICE 'ST_AsEWKT(_geom): %', 'ST_GeomFromEWKT(''' ||ST_AsEWKT(_geom)||''')';
+				--RAISE NOTICE '_definition: %', _definition;
+				--RAISE NOTICE 'custom_definition: %', custom_definition;
 				-- aux 1 tm 6
 				IF _aux_1 IS NOT NULL THEN custom_definition := replace(custom_definition, 'aux_1', 'ST_GeomFromEWKT(''' ||ST_AsEWKT(aux_1_geom)||''')'); END IF;
 				IF _aux_2 IS NOT NULL THEN custom_definition := replace(custom_definition, 'aux_2', 'ST_GeomFromEWKT(''' ||ST_AsEWKT(aux_2_geom)||''')'); END IF;
@@ -87,6 +90,8 @@
 				IF _param_4 IS NOT NULL THEN custom_definition := replace(custom_definition, 'param_4', _param_4::text); END IF;
 				IF _param_5 IS NOT NULL THEN custom_definition := replace(custom_definition, 'param_5', _param_5::text); END IF;
 				IF _param_6 IS NOT NULL THEN custom_definition := replace(custom_definition, 'param_6', _param_6::text); END IF;
+
+				--RAISE NOTICE 'custom_definition: %', custom_definition;
 
 				-- nieuw raster maken
 				UPDATE rc.surface_admin AS sa
