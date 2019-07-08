@@ -1,6 +1,5 @@
 
-
-	-- The following function updated the raster for the surfaces with the specified id;
+	-- The following function updates the raster for the surfaces with the specified id;
 	CREATE OR REPLACE FUNCTION rc.update_raster(id_to_update integer)
 	RETURNS VOID AS
 	$BODY$
@@ -14,6 +13,7 @@
 		    cbf_fullname text;
 		    custom_definition text;
 		    empty_raster raster;
+			success boolean;
 		BEGIN
 			--RAISE NOTICE '-----------------------------------------';
 			SELECT 	definition, 	definition_type, 	geom, 	aux_1, 	aux_2, 	aux_3, 	aux_4, 	aux_5, 	aux_6, 	param_1, 	param_2, 	param_3, 	param_4, 	param_5, 	param_6
@@ -24,7 +24,8 @@
 			
 
 			-- do nothing (yet) for filler polygons
-			IF _definition_type = 'filler' THEN
+			IF _definition_type = 'filler' 
+			THEN
 				RAISE NOTICE 'Postponing raster creation for surface with id %, because it is a filler polygon.', id_to_update; 
 				RETURN; 
 			END IF;
@@ -35,13 +36,14 @@
 			END IF;
 
 			-- handle the 'tin' definition type
-			IF _definition_type = 'tin' THEN
+			IF _definition_type = 'tin' 
+			THEN
 				UPDATE rc.surface_admin AS sa
 				SET 	rast = rc.tin(geom, rc.LeesInstelling('elevation_point_search_radius')::double precision, rc.LeesInstelling('pixelsize')::double precision)
 				FROM rc.surface AS s
 				WHERE id_to_update = s.id AND s.id = sa.id
 				;
-				
+				PERFORM rc.check_validity(id_to_update);
 				RETURN;
 			END IF;
 
@@ -69,7 +71,8 @@
 		    -- als definition_type 'custom' is dan anders afhandelen dan de andere definition types
 		    -- 'custom' wordt namelijk het meest gebruikt, en op deze manier wordt zoveel mogelijk code buiten de callbackfucntie gehouden
 		    -- en dus maar 1 keer uitgevoerd per polygoon ipv per pixel
-			IF _definition_type = 'custom' THEN
+			IF _definition_type = 'custom' 
+			THEN
 				-- geom
 				custom_definition := replace(_definition, 'geom', 'ST_GeomFromEWKT(''' ||ST_AsEWKT(_geom)||''')');
 				--RAISE NOTICE 'ST_AsEWKT(_geom): %', 'ST_GeomFromEWKT(''' ||ST_AsEWKT(_geom)||''')';
@@ -116,7 +119,8 @@
 				FROM rc.surface AS s
 				WHERE   id_to_update = s.id AND s.id = sa.id
 				;
-
+                
+				PERFORM rc.check_validity(id_to_update);
 				RETURN;
 
 			ELSE 
@@ -155,14 +159,9 @@
 				FROM rc.surface AS s
 				WHERE id_to_update = s.id AND s.id = sa.id
 				;
-
-				IF (SELECT rast IS NULL FROM rc.surface_admin WHERE id_to_update = id) 
-				THEN RAISE EXCEPTION 'update_raster() resulted in a a NULL raster for surface with id %', id_to_update;
-				END IF;
-				
-				RETURN;
-					
+                
+		        PERFORM rc.check_validity(id_to_update);
+                RETURN;
 			END IF;
-
 		END;
 	$BODY$ LANGUAGE plpgsql;

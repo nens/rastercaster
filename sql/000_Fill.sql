@@ -87,7 +87,8 @@
 				WHERE   id_to_update = s.id AND s.id = sa.id
 				;
 			END IF;
-
+			
+			PERFORM rc.check_validity(id_to_update);
             RETURN;
 
 		END;

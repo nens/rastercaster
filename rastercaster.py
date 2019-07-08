@@ -267,12 +267,12 @@ def cast_raster(settings):
     
     vrtname=os.path.join('/vsimem/', r'cast.vrt')
     gdal.BuildVRT(destName=vrtname, srcDSOrSrcDSTab=tifList, srcNodata=-9999, VRTNodata=-9999, outputSRS='EPSG:28992') 
-        
+    
     cast_inmem=os.path.join('/vsimem/', r'cast.tif')
     vrt = gdal.Open(vrtname)
     tmp = gdal.Translate(destName=cast_inmem, srcDS=vrt, format='Gtiff', noData=-9999, outputSRS='EPSG:28992', outputType=gdal.GDT_Float32, creationOptions=['COMPRESS=DEFLATE'])
     tmp = None
-            
+    
     #________________
     # fill open pixels if there are any filler or tin surfaces in the raster
     print('''Drying gypsum...''')
