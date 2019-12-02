@@ -1,0 +1,6 @@
+https://stackoverflow.com/questions/40397477/how-do-i-make-an-elevation-model-from-a-3d-polygon
+
+Wat de RasterCaster doet lijkt met tin lijkt veemoedelijk erg op tin + breaklines. Hieruit jatten als we een plugin gaan maken
+https://docs.qgis.org/2.8/en/docs/user_manual/plugins/plugins_interpolation.html
+
+
