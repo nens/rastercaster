@@ -8,10 +8,15 @@
 # TODO: in alle datalagen (elevation point, surface, aux) de optie relative toevoegen (default false) om interactie met base raster mogelijk te maken
 
 
+from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import absolute_import
+from __future__ import division
+
 import argparse
 import logging
 import os, sys
-import configparser
+import ConfigParser
 import shutil
 import psycopg2
 import traceback
@@ -43,7 +48,7 @@ class settingsObject:
         self.port = 5432
     
     def read(self, inifile):
-        config = configparser.RawConfigParser()
+        config = ConfigParser.RawConfigParser()
         config.read(inifile)	
         
         # database
@@ -87,7 +92,7 @@ def execute_sql_command(host, port, database, username, password, sql, verbose=F
         try:
             conn.commit()
 
-        except psycopg2.DatabaseError as e:
+        except psycopg2.DatabaseError, e:
 
             if conn:
                 conn.rollback()
@@ -120,7 +125,7 @@ def execute_sql_file(host, port, database, username, password, filename, verbose
         try:
             conn.commit()
         
-        except psycopg2.DatabaseError as e:
+        except psycopg2.DatabaseError, e:
             
             if conn:
                 conn.rollback()
@@ -141,7 +146,7 @@ def execute_sql_file(host, port, database, username, password, filename, verbose
         
 def install(settings):
 
-    answer = input(r'Existing rastercaster data in the database will be overwritten. Are you sure? (Y/N): ')
+    answer = raw_input(r'Existing rastercaster data in the database will be overwritten. Are you sure? (Y/N): ')
     if answer in ('Y', 'y', 'J', 'j', 'prima joh'):
         # (create database if not exists)
         # enable postgis
@@ -185,7 +190,7 @@ def cast_raster(settings):
         
         try:
             conn.commit()
-        except psycopg2.DatabaseError as e:
+        except psycopg2.DatabaseError, e:
             if conn:
                 conn.rollback()
             logger.error('Error %s' % e)
@@ -242,141 +247,132 @@ def cast_raster(settings):
                 
     #____________________________________________________________
     # stitch all partial rasters together (base raster not involved yet)
-    if len(all_ids) > len(failed_ids): # prevent Exception when no surface has successfully been cast
-        print('''Casting gypsum to molds...''')
-        count = 0
-        tifList=list()
-
-        for id in all_ids:
-            if id not in failed_ids:
-
-                ds_string = "PG:host='{h}' port={p} dbname='{d}' user='{u}' password='{pw}' schema='rc' table='surface_admin' mode='2' where='id = {id}'".format(h=settings.host, p=settings.port, d=settings.database, u=settings.username, pw=settings.password, id=id)
-                execute_sql_command(host=settings.host, port=settings.port, database=settings.database, username=settings.username, password=settings.password, sql='''UPDATE rc.surface_admin SET exported = now() WHERE id = {id};'''.format(id=id))
-                tifList.append(ds_string)
-                
-                
-            try:
-                count+=1;
-                ogr.TermProgress_nocb((count)/len(all_ids))
-            except:
-                continue
+    print('''Casting gypsum to molds...''')
+    count = 0
+    tifList=list()
     
-        vrtname=os.path.join('/vsimem/', r'cast.vrt')
-        gdal.BuildVRT(destName=vrtname, srcDSOrSrcDSTab=tifList, srcNodata=-9999, VRTNodata=-9999, outputSRS='EPSG:28992') 
+    for id in all_ids:
+        if id not in failed_ids:
+
+            ds_string = "PG:host='{h}' port={p} dbname='{d}' user='{u}' password='{pw}' schema='rc' table='surface_admin' mode='2' where='id = {id}'".format(h=settings.host, p=settings.port, d=settings.database, u=settings.username, pw=settings.password, id=id)
+            execute_sql_command(host=settings.host, port=settings.port, database=settings.database, username=settings.username, password=settings.password, sql='''UPDATE rc.surface_admin SET exported = now() WHERE id = {id};'''.format(id=id))
+            tifList.append(ds_string)
+            
+            
+        try:
+            count+=1;
+            ogr.TermProgress_nocb((count)/len(all_ids))
+        except:
+            continue
+    
+    vrtname=os.path.join('/vsimem/', r'cast.vrt')
+    gdal.BuildVRT(destName=vrtname, srcDSOrSrcDSTab=tifList, srcNodata=-9999, VRTNodata=-9999, outputSRS='EPSG:28992') 
+    
+    cast_inmem=os.path.join('/vsimem/', r'cast.tif')
+    vrt = gdal.Open(vrtname)
+    tmp = gdal.Translate(destName=cast_inmem, srcDS=vrt, format='Gtiff', noData=-9999, outputSRS='EPSG:28992', outputType=gdal.GDT_Float32, creationOptions=['COMPRESS=DEFLATE'])
+    tmp = None
+    
+    #________________
+    # fill open pixels if there are any filler or tin surfaces in the raster
+    print('''Drying gypsum...''')
+    if must_fill_open_pixels: 
+        # ### create a mask that has value 1 for all pixels outside the rc.surface polygon
+        # ### ### write vrt dimensions (width, height, upperleftx, upperlefty) to database
+        sql = '''
+            DELETE FROM rc.instellingen WHERE variabele IN ('vrt_width', 'vrt_height', 'vrt_ulx', 'vrt_uly');
+            INSERT INTO rc.instellingen (variabele, waarde) VALUES 
+                ('vrt_width','{w}'), 
+                ('vrt_height','{h}'), 
+                ('vrt_ulx','{x}'),
+                ('vrt_uly','{y}')
+            ;
+            SELECT rc.create_fillnodatamask();
+        '''.format(w=vrt.RasterXSize,h=vrt.RasterYSize, x=vrt.GetGeoTransform()[0] ,y=vrt.GetGeoTransform()[3])
         
-        cast_inmem=os.path.join('/vsimem/', r'cast.tif')
-        vrt = gdal.Open(vrtname)
-        tmp = gdal.Translate(destName=cast_inmem, srcDS=vrt, format='Gtiff', noData=-9999, outputSRS='EPSG:28992', outputType=gdal.GDT_Float32, creationOptions=['COMPRESS=DEFLATE'])
+        execute_sql_command(host=settings.host, port=settings.port, database=settings.database, username=settings.username, password=settings.password, sql=sql)
+        vrt = None
+        gdal.Unlink(vrtname)
+        
+        mask_in_db_string = "PG:host='{h}' port={p} dbname='{d}' user='{u}' password='{pw}' schema='rc' table='fillnodatamask' mode='2'".format(h=settings.host, p=settings.port, d=settings.database, u=settings.username, pw=settings.password)
+        mask_inmem1=os.path.join('/vsimem/', r'mask1.tif')
+        mask_in_db = gdal.Open(mask_in_db_string)
+        tmp = gdal.Translate(destName=mask_inmem1, srcDS=mask_in_db, noData=0)
         tmp = None
+        mask_in_db = None
         
-        #________________
-        # fill open pixels if there are any filler or tin surfaces in the raster
-        print('''Drying gypsum...''')
-        if must_fill_open_pixels: 
-            # ### create a mask that has value 1 for all pixels outside the rc.surface polygon
-            # ### ### write vrt dimensions (width, height, upperleftx, upperlefty) to database
-            sql = '''
-                DELETE FROM rc.instellingen WHERE variabele IN ('vrt_width', 'vrt_height', 'vrt_ulx', 'vrt_uly');
-                INSERT INTO rc.instellingen (variabele, waarde) VALUES 
-                    ('vrt_width','{w}'), 
-                    ('vrt_height','{h}'), 
-                    ('vrt_ulx','{x}'),
-                    ('vrt_uly','{y}')
-                ;
-                SELECT rc.create_fillnodatamask();
-            '''.format(w=vrt.RasterXSize,h=vrt.RasterYSize, x=vrt.GetGeoTransform()[0] ,y=vrt.GetGeoTransform()[3])
-            
-            execute_sql_command(host=settings.host, port=settings.port, database=settings.database, username=settings.username, password=settings.password, sql=sql)
-            vrt = None
-            gdal.Unlink(vrtname)
-            
-            mask_in_db_string = "PG:host='{h}' port={p} dbname='{d}' user='{u}' password='{pw}' schema='rc' table='fillnodatamask' mode='2'".format(h=settings.host, p=settings.port, d=settings.database, u=settings.username, pw=settings.password)
-            mask_inmem1=os.path.join('/vsimem/', r'mask1.tif')
-            mask_in_db = gdal.Open(mask_in_db_string)
-            tmp = gdal.Translate(destName=mask_inmem1, srcDS=mask_in_db, noData=0)
-            tmp = None
-            mask_in_db = None
-            
-            # ### create a mask that has value 1 for all active pixels in the cast AND for all pixels outside the rc.surface polygon (1+1=2)
-            
-            m = gdal.Open(mask_inmem1, GA_ReadOnly)
-            m_band = m.GetRasterBand(1)
-            m_data = BandReadAsArray(m_band)
-            c = gdal.Open(cast_inmem, GA_ReadOnly)
-            c_band = c.GetRasterBand(1)
-            c_data = BandReadAsArray(c_band)
-            
-            dataOut = ((c_data==-9999)+(m_data))!=2
-
-            driver = gdal.GetDriverByName(str('GTiff'))
-            mask_inmem2 = '/vsimem/mask2.tif'
-            dsOut = driver.Create(str(mask_inmem2), m.RasterXSize, m.RasterYSize, 1, m_band.DataType)
-            CopyDatasetInfo(m,dsOut)
-            bandOut=dsOut.GetRasterBand(1)
-            BandWriteArray(bandOut, dataOut)
-
-            m_band = None
-            m = None
-            c_band = None
-            c = None
-            bandOut = None
-            dsOut = None
-
-            # ### use the created mask as input in gdal.FillNoData
-            castDs = gdal.Open(cast_inmem, GA_Update)
-            castBand = castDs.GetRasterBand(1)
-            mask = gdal.Open(mask_inmem2)
-            maskBand = mask.GetRasterBand(1)
-            filled = gdal.FillNodata(targetBand = castBand, maskBand = maskBand, maxSearchDist = 2, smoothingIterations = 0)
-            filled = None
-            
-            maskBand = None
-            mask = None
-            castBand = None
-            castDs = None
+        # ### create a mask that has value 1 for all active pixels in the cast AND for all pixels outside the rc.surface polygon (1+1=2)
         
-        #___________________________________________               
-        # make vrt of base raster and cast
-        tifList = list()
-        tifList.append(cast_inmem)
-        # ### somehow there two versions of EPSG:28992 exist that differ in their TOWGS84 parameter
-        # ### gdal treats these as different projections, and therefore will not add both to the same vrt
-        # ### if this is the case, the base raster is read into memory, it's projection overwritten with the same version of EPGS:28992 as the RasterCaster output
-        if settings.base_raster != '':
-            base_raster_ds = gdal.Open(settings.base_raster)
-            base_raster_sr = osr.SpatialReference(wkt = base_raster_ds.GetProjection())
-            
-            last_db_raster_ds = gdal.Open(ds_string)
-            last_db_raster_sr = osr.SpatialReference(wkt = last_db_raster_ds.GetProjection())
-            
-            if base_raster_sr.GetAttrValue(str('authority'), 0) == last_db_raster_sr.GetAttrValue(str('authority'), 0) and base_raster_sr.GetAttrValue(str('authority'), 1) == last_db_raster_sr.GetAttrValue(str('authority'), 1):
-                if base_raster_sr != last_db_raster_sr:
-                    print('''NOTICE: Base raster and database rasters have different definitions of the same SRS ({a}:{c}). Casting will take some extra time.'''.format(a=base_raster_sr.GetAttrValue(str('authority'), 0), c=base_raster_sr.GetAttrValue(str('authority'), 1)))
-                    tr = gdal.Translate(destName='/vsimem/baseraster.tif', srcDS=base_raster_ds)
-                    base_raster_inmem = gdal.Open('/vsimem/baseraster.tif', GA_Update)
-                    res = base_raster_inmem.SetProjection(last_db_raster_ds.GetProjection())
-                    res = None
-                    base_raster_inmem = None
-                    tifList.insert(0, '/vsimem/baseraster.tif') 
-                else:
-                    tifList.insert(0, settings.base_raster) 
+        m = gdal.Open(mask_inmem1, GA_ReadOnly)
+        m_band = m.GetRasterBand(1)
+        m_data = BandReadAsArray(m_band)
+        c = gdal.Open(cast_inmem, GA_ReadOnly)
+        c_band = c.GetRasterBand(1)
+        c_data = BandReadAsArray(c_band)
         
-        vrtname=os.path.join('/vsimem/','cast.vrt')
-        tmp = gdal.BuildVRT(destName=vrtname, srcDSOrSrcDSTab=tifList, srcNodata=-9999, VRTNodata=-9999, outputSRS='EPSG:28992') 
-        tmp = None
-        
-        tmp = gdal.Translate(destName=settings.output_file, srcDS=vrtname, noData=-9999, stats=True, outputType=gdal.GDT_Float32, creationOptions=['COMPRESS=DEFLATE'])
-        tmp = None
-        castDs=None
+        dataOut = ((c_data==-9999)+(m_data))!=2
 
-    else:
-        if settings.base_raster == '':
-            print('''WARNING! No surfaces were successfully cast. Returning no result.''' )
-        else: 
-            print('''WARNING! No surfaces were successfully cast. Returning base raster.''' )
-            base_raster_ds = gdal.Open(settings.base_raster)
-            tmp = gdal.Translate(destName=settings.output_file, srcDS=base_raster_ds, noData=-9999, stats=True, outputType=gdal.GDT_Float32, creationOptions=['COMPRESS=DEFLATE'])
-            
+        driver = gdal.GetDriverByName(str('GTiff'))
+        mask_inmem2 = '/vsimem/mask2.tif'
+        dsOut = driver.Create(str(mask_inmem2), m.RasterXSize, m.RasterYSize, 1, m_band.DataType)
+        CopyDatasetInfo(m,dsOut)
+        bandOut=dsOut.GetRasterBand(1)
+        BandWriteArray(bandOut, dataOut)
+
+        m_band = None
+        m = None
+        c_band = None
+        c = None
+        bandOut = None
+        dsOut = None
+
+        # ### use the created mask as input in gdal.FillNoData
+        castDs = gdal.Open(cast_inmem, GA_Update)
+        castBand = castDs.GetRasterBand(1)
+        mask = gdal.Open(mask_inmem2)
+        maskBand = mask.GetRasterBand(1)
+        filled = gdal.FillNodata(targetBand = castBand, maskBand = maskBand, maxSearchDist = 2, smoothingIterations = 0)
+        filled = None
+        
+        maskBand = None
+        mask = None
+        castBand = None
+        castDs = None
+    
+    #___________________________________________               
+    # make vrt of base raster and cast
+    tifList = list()
+    tifList.append(cast_inmem)
+    # ### somehow there two versions of EPSG:28992 exist that differ in their TOWGS84 parameter
+    # ### gdal treats these as different projections, and therefore will not add both to the same vrt
+    # ### if this is the case, the base raster is read into memory, it's projection overwritten with the same version of EPGS:28992 as the RasterCaster output
+    if settings.base_raster != '':
+        base_raster_ds = gdal.Open(settings.base_raster)
+        base_raster_sr = osr.SpatialReference(wkt = base_raster_ds.GetProjection())
+        
+        last_db_raster_ds = gdal.Open(ds_string)
+        last_db_raster_sr = osr.SpatialReference(wkt = last_db_raster_ds.GetProjection())
+        
+        if base_raster_sr.GetAttrValue(str('authority'), 0) == last_db_raster_sr.GetAttrValue(str('authority'), 0) and base_raster_sr.GetAttrValue(str('authority'), 1) == last_db_raster_sr.GetAttrValue(str('authority'), 1):
+            if base_raster_sr != last_db_raster_sr:
+                print('''NOTICE: Base raster and database rasters have different definitions of the same SRS ({a}:{c}). Casting will take some extra time.'''.format(a=base_raster_sr.GetAttrValue(str('authority'), 0), c=base_raster_sr.GetAttrValue(str('authority'), 1)))
+                tr = gdal.Translate(destName='/vsimem/baseraster.tif', srcDS=base_raster_ds)
+                base_raster_inmem = gdal.Open('/vsimem/baseraster.tif', GA_Update)
+                res = base_raster_inmem.SetProjection(last_db_raster_ds.GetProjection())
+                res = None
+                base_raster_inmem = None
+                tifList.insert(0, '/vsimem/baseraster.tif') 
+            else:
+                tifList.insert(0, settings.base_raster) 
+    
+    vrtname=os.path.join('/vsimem/','cast.vrt')
+    tmp = gdal.BuildVRT(destName=vrtname, srcDSOrSrcDSTab=tifList, srcNodata=-9999, VRTNodata=-9999, outputSRS='EPSG:28992') 
+    tmp = None
+    
+    tmp = gdal.Translate(destName=settings.output_file, srcDS=vrtname, noData=-9999, stats=True, outputType=gdal.GDT_Float32, creationOptions=['COMPRESS=DEFLATE'])
+    tmp = None
+    castDs=None
+    
     if has_failed==True:
         print('Warning: rasters for some surfaces were not succesfully generated. IDs: {f}'.format(f=failed_ids))
     else:
