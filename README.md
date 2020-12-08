@@ -29,7 +29,8 @@ The below command line examples assume that you first `cd` to the folder where y
 ### Install
 1. Clone or download the GitHub repo
 2. Copy settings.ini and fill with the values specific to your project.
-3. Run the following command:
+3. If your database server uses PostGIS 3.x, you will need to manually activate postgis_raster. Execute the following query `CREATE EXTENSION postgis_raster;`
+4. Run the following command:
 
 ```
 python rastercaster.py -install path\to\your\settings.ini
