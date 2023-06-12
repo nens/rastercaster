@@ -19,7 +19,7 @@ import subprocess
 from shutil import copyfile
 from osgeo import ogr, gdal, osr
 from osgeo.gdalnumeric import *
-from gdalconst import *
+from osgeo.gdalconst import *
 
 logger = logging.getLogger(__name__)
 
