@@ -15,6 +15,7 @@ import configparser
 import shutil
 import psycopg2
 import traceback
+
 import subprocess
 from shutil import copyfile
 from osgeo import ogr, gdal, osr
@@ -252,7 +253,7 @@ def cast_raster(settings):
         for id in all_ids:
             if id not in failed_ids:
 
-                ds_string = "PG:host='{h}' port={p} dbname='{d}' user='{u}' password='{pw}' schema='rc' table='surface_admin' mode='2' where='id = {id}'".format(h=settings.host, p=settings.port, d=settings.database, u=settings.username, pw=settings.password, id=id)
+                ds_string = f'PG:host={settings.host} port={settings.port} dbname={settings.database} user={settings.username} password={settings.password} schema=rc table=surface_admin mode=2 where="id = {id}"'
                 execute_sql_command(host=settings.host, port=settings.port, database=settings.database, username=settings.username, password=settings.password, sql='''UPDATE rc.surface_admin SET exported = now() WHERE id = {id};'''.format(id=id))
                 tifList.append(ds_string)
                 
@@ -261,16 +262,21 @@ def cast_raster(settings):
                 count+=1;
                 ogr.TermProgress_nocb((count)/len(all_ids))
             except:
-                continue
-    
-        vrtname=os.path.join('/vsimem/', r'cast.vrt')
-        gdal.BuildVRT(destName=vrtname, srcDSOrSrcDSTab=tifList, srcNodata=-9999, VRTNodata=-9999, outputSRS='EPSG:28992') 
-        
+                continue    
+
         cast_inmem=os.path.join('/vsimem/', r'cast.tif')
-        vrt = gdal.Open(vrtname)
-        tmp = gdal.Translate(destName=cast_inmem, srcDS=vrt, format='Gtiff', noData=-9999, outputSRS='EPSG:28992', outputType=gdal.GDT_Float32, creationOptions=['COMPRESS=DEFLATE'])
-        tmp = None
-        
+        gdal.Warp(
+            destNameOrDestDS=cast_inmem,
+            srcDSOrSrcDSTab=tifList,
+            format='GTiff',
+            dstSRS='EPSG:28992',
+            srcNodata=-9999,
+            dstNodata=-9999,
+            outputType=gdal.GDT_Float32,
+            creationOptions=["TILED=YES", "COMPRESS=DEFLATE", "PREDICTOR=2", "ZLEVEL=9"]
+        )
+
+                
         #________________
         # fill open pixels if there are any filler or tin surfaces in the raster
         print('''Drying gypsum...''')
