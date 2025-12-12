@@ -626,7 +626,7 @@ BEGIN
 	END IF;
 	
 	IF n > ST_NumPoints(inputlijn) THEN 
- 		RAISE NOTICE 'n is groter dan het aantal vertices van de inputlijn (%), wordt automatisch naar % gesnapt', ST_NumPoints(inputlijn)`, ST_NumPoints(inputlijn);
+ 		RAISE NOTICE 'n is groter dan het aantal vertices van de inputlijn (%), wordt automatisch naar % gesnapt', ST_NumPoints(inputlijn), ST_NumPoints(inputlijn);
 		n := greatest(n, ST_NumPoints(inputlijn));
 	END IF;
 

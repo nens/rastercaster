@@ -147,6 +147,7 @@ def install(settings):
         # enable postgis
         print('Enable PostGIS...')
         execute_sql_command(host=settings.host, port=settings.port, database=settings.database, username=settings.username, password=settings.password, sql='''CREATE EXTENSION IF NOT EXISTS postgis;''')
+        execute_sql_command(host=settings.host, port=settings.port, database=settings.database, username=settings.username, password=settings.password, sql='''CREATE EXTENSION IF NOT EXISTS postgis_raster;''')
         
         # add rastercaster functions and tables to the database
         print('Add RasterCaster functions and tables to the database...')
@@ -160,9 +161,6 @@ def install(settings):
             filename = os.path.join(rastercaster_dir, file)
             if filename.endswith(".sql"): 
                 execute_sql_file(host=settings.host, port=settings.port, database=settings.database, username=settings.username, password=settings.password, filename=filename)
-                continue
-            else:
-                continue
 
         execute_sql_command(host=settings.host, port=settings.port, database=settings.database, username=settings.username, password=settings.password, sql='''DELETE FROM rc.instellingen; INSERT INTO rc.instellingen VALUES ('pixelsize','{p}'), ('filler_seg_dist','{f}'), ('elevation_point_search_radius', '{e}');'''.format(p=settings.pixelsize, f=settings.filler_seg_dist, e=settings.elevation_point_search_radius))
 
