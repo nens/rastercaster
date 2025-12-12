@@ -21,6 +21,11 @@ from osgeo import ogr, gdal, osr
 from osgeo.gdalnumeric import *
 from osgeo.gdalconst import *
 
+gdal.UseExceptions()
+ogr.UseExceptions()
+osr.UseExceptions()
+
+
 logger = logging.getLogger(__name__)
 
 def system_custom(cmd):
@@ -261,7 +266,10 @@ def cast_raster(settings):
             except:
                 continue
     
-        vrtname=os.path.join('/vsimem/', r'cast.vrt')
+        print(tifList)
+    
+        # vrtname=os.path.join('/vsimem/', r'cast.vrt')
+        vrtname=os.path.join('cast.vrt')
         gdal.BuildVRT(destName=vrtname, srcDSOrSrcDSTab=tifList, srcNodata=-9999, VRTNodata=-9999, outputSRS='EPSG:28992') 
         
         cast_inmem=os.path.join('/vsimem/', r'cast.tif')

@@ -1,0 +1,16 @@
+<VRTDataset rasterXSize="60" rasterYSize="50">
+  <SRS dataAxisToSRSAxisMapping="1,2">PROJCS["Amersfoort / RD New",GEOGCS["Amersfoort",DATUM["Amersfoort",SPHEROID["Bessel 1841",6377397.155,299.1528128,AUTHORITY["EPSG","7004"]],AUTHORITY["EPSG","6289"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4289"]],PROJECTION["Oblique_Stereographic"],PARAMETER["latitude_of_origin",52.1561605555556],PARAMETER["central_meridian",5.38763888888889],PARAMETER["scale_factor",0.9999079],PARAMETER["false_easting",155000],PARAMETER["false_northing",463000],UNIT["metre",1,AUTHORITY["EPSG","9001"]],AXIS["Easting",EAST],AXIS["Northing",NORTH],AUTHORITY["EPSG","28992"]]</SRS>
+  <GeoTransform>  1.3424450000000000e+05,  5.0000000000000000e-01,  0.0000000000000000e+00,  4.4701800000000000e+05,  0.0000000000000000e+00, -5.0000000000000000e-01</GeoTransform>
+  <VRTRasterBand dataType="Float32" band="1">
+    <NoDataValue>-9999</NoDataValue>
+    <ColorInterp>Gray</ColorInterp>
+    <ComplexSource>
+      <SourceFilename relativeToVRT="1">"PG:host='con-gis-db-02.nens' port=5432 dbname='postgisdag_rastercaster_test' user='utrecht' password='utrecht' schema='rc' table='surface_admin' mode='2' where='id = 1'"</SourceFilename>
+      <SourceBand>1</SourceBand>
+      <SourceProperties RasterXSize="60" RasterYSize="50" DataType="Float32" BlockXSize="60" BlockYSize="50" />
+      <SrcRect xOff="0" yOff="0" xSize="60" ySize="50" />
+      <DstRect xOff="0" yOff="0" xSize="60" ySize="50" />
+      <NODATA>-9999</NODATA>
+    </ComplexSource>
+  </VRTRasterBand>
+</VRTDataset>
