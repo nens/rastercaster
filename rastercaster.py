@@ -21,6 +21,10 @@ from osgeo import ogr, gdal, osr
 from osgeo.gdalnumeric import *
 from osgeo.gdalconst import *
 
+gdal.UseExceptions()
+ogr.UseExceptions()
+osr.UseExceptions()
+
 logger = logging.getLogger(__name__)
 
 def system_custom(cmd):
